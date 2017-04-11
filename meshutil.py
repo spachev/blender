@@ -22,6 +22,11 @@ def get_brick_verts(o,l,w,h):
 
 	return verts
 
+def get_hollow_brick_faces():
+	return [[5,7,3,1], [4,0,2,6],
+		[0,4,5,1],[6,2,3,7]
+	]
+
 def get_circle_verts(o,r,n):
 	theta = 0
 	verts = []
