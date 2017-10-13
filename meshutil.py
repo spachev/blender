@@ -1,7 +1,7 @@
 import math
 import bpy
 from math import radians
-from mathutils import Matrix
+from mathutils import Matrix,Vector
 from itertools import product
 
 def mul_v(v,k):
@@ -26,6 +26,24 @@ def get_hollow_brick_faces():
 	return [[5,7,3,1], [4,0,2,6],
 		[0,4,5,1],[6,2,3,7]
 	]
+
+# dl - delta length for the top part of the trapezoidal prism
+def get_tp_prism_verts(o,l,w,h,dl,rot_x,rot_y,rot_z):
+	verts = []
+	plus_minus = (-1.0,1.0)
+
+	for x,y,z in product(plus_minus, repeat=3):
+		if x < 0.0 and z > 0.0:
+			verts.append(Vector((x*l/2.0 , y*w/2.0, z*h/2.0)))
+		else:
+			verts.append(Vector((x*(l/2.0+dl), y*w/2.0, z*h/2.0)))
+
+	mat_rot_x = Matrix.Rotation(rot_x, 3, 'X')
+	mat_rot_y = Matrix.Rotation(rot_y, 3, 'Y')
+	mat_rot_z = Matrix.Rotation(rot_z, 3, 'Z')
+	mat_rot = mat_rot_x * mat_rot_y * mat_rot_z
+	print(mat_rot)
+	return [v * mat_rot  for v in verts]
 
 def get_circle_verts(o,r,n):
 	theta = 0
