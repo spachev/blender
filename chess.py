@@ -26,6 +26,7 @@ def get_args():
 	parser.add_argument('--thickness', help="thickness", required=True)
 	parser.add_argument('--num-parts', help="number of circle segements", required=True)
 	parser.add_argument('--num-vparts', help="number of vertical segements", required=True)
+	parser.add_argument('--piece', help='chess piece name', required=True)
 	parsed_script_args, _ = parser.parse_known_args(script_args)
 	return parsed_script_args
 
@@ -33,5 +34,10 @@ args = get_args()
 
 origin = (0,0,0)
 h = float(args.height)
+r = float(args.radius)
+th = float(args.thickness)
+n = int(args.num_parts)
+vn = int(args.num_vparts)
+piece = args.piece
 print("h=" + str(h))
 
