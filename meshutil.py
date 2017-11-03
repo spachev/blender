@@ -59,6 +59,12 @@ def get_circle_verts(o,r,n):
 
 	return verts
 
+def reset_scene():
+	scn = bpy.context.scene
+	obs = scn.objects
+	for ob in obs:
+		obs.unlink(ob)
+
 def create_mesh_from_data(name, origin, verts, faces, remove_cube=True):
 	me = bpy.data.meshes.new(name+'Mesh')
 	ob = bpy.data.objects.new(name, me)
@@ -70,9 +76,10 @@ def create_mesh_from_data(name, origin, verts, faces, remove_cube=True):
 	obs = scn.objects
 
 	if remove_cube:
-		cube_ob = [cube_ob for cube_ob in obs if cube_ob.name == 'Cube'][0]
-		if cube_ob:
-			obs.unlink(cube_ob)
+
+		cube_obs = [cube_ob for cube_ob in obs if cube_ob.name == 'Cube']
+		if len(cube_obs):
+			obs.unlink(cube_obs[0])
 
 	scn.objects.link(ob)
 	scn.objects.active = ob

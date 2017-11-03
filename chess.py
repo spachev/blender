@@ -53,8 +53,24 @@ def mk_file_path(orig_fname, suffix):
 		return orig_fname + "-" + suffix + ".stl"
 	return parts[0] + "-" + suffix + "." + parts[1]
 
-def make_pawn_bottom():
+# TODO: finish
+def make_pawn_top():
+	mu.reset_scene()
+	bpy.ops.export_mesh.stl(filepath=mk_file_path(args.save,"top"),ascii=False)
+
+# TODO: finish
+def make_pawn_middle():
+	mu.reset_scene()
 	x = 0.0
+	dx = base_h / float(vn)
+	verts = []
+	faces = []
+	cur_r = r
+	bpy.ops.export_mesh.stl(filepath=mk_file_path(args.save,"middle"),ascii=False)
+
+def make_pawn_bottom():
+	mu.reset_scene()
+	x = base_top_r
 	dx = base_h / float(vn)
 	verts = []
 	faces = []
@@ -81,11 +97,15 @@ def make_pawn_bottom():
 	#print(faces)
 	faces.append(range(0,n))
 	faces.append(range((vn - 1) * n, vn * n))
-	mu.create_mesh_from_data('Pawn', o_v, verts, faces, True)
+	mu.create_mesh_from_data('Pawn Bottom', o_v, verts, faces, True)
 	bpy.ops.export_mesh.stl(filepath=mk_file_path(args.save,"bottom"),ascii=False)
 
 base_top_r = r * rq
 base_q = 0.2
+middle_q = 0.5
+top_q = 1.0 - (base_q + middle_q)
 base_h = h * base_q
 
 make_pawn_bottom()
+make_pawn_middle()
+make_pawn_top()
