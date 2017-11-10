@@ -37,17 +37,20 @@ def mk_file_path(orig_fname, suffix):
 		return orig_fname + "-" + suffix + ".stl"
 	return parts[0] + "-" + suffix + "." + parts[1]
 
-class Pawn:
+class Piece:
 	def __init__(self):
-		self.rq = 0.5 # ratio pawn base top to bottom radius
-		self.bend_rq = 0.6 # ratio of bend_top_r to base_top_r
+		self.rq = 0.5 # ratio piece base top to bottom radius
 		self.base_top_r = r * self.rq
-		self.base_q = 0.25
-		self.middle_q = 0.4
+		self.base_h = h * self.base_q()
+		self.middle_h = h * self.middle_q()
+	def top_q(self):
+		return 1.0 - self.base_q() - self.middle_q()
+
+class Pawn(Piece):
+	def __init__(self):
+		super().__init__()
+		self.bend_rq = 0.6 # ratio of bend_top_r to base_top_r
 		self.bend_q = 0.7
-		self.top_q = 1.0 - (self.base_q + self.middle_q)
-		self.base_h = h * self.base_q
-		self.middle_h = h * self.middle_q
 		self.bend_h = self.base_h + self.middle_h * self.bend_q
 		self.bend_r = self.base_top_r * self.bend_rq
 		self.middle_top_r = self.middle_cur_r(self.middle_h + self.base_h)
@@ -69,9 +72,14 @@ class Pawn:
 		print("bend_r=" + str(self.bend_r))
 		print("top_shift_h = " + str(self.top_shift_h) + " top_h = " + str(self.top_h))
 
-		self.vn_base = int(vn * self.base_q)
-		self.vn_middle = int(vn * self.middle_q)
-		self.vn_top = int(vn * self.top_q)
+		self.vn_base = int(vn * self.base_q())
+		self.vn_middle = int(vn * self.middle_q())
+		self.vn_top = int(vn * self.top_q())
+
+	def base_q(self):
+		return 0.25
+	def middle_q(self):
+		return 0.4
 
 	def base_cur_r(self, x):
 		return (self.base_top_r - r)/(self.base_h * self.base_h) * x * x + r
