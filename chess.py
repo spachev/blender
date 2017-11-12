@@ -39,14 +39,79 @@ def mk_file_path(orig_fname, suffix):
 
 class Piece:
 	def __init__(self):
+		pass
+
+	def get_fname(self):
+		return self.get_piece_name().lower() + ".stl"
+
+	def make_conic_part(self, start_x, part_h, vn_arg, cur_r_f, part_name, all_in_one = False):
+		if not all_in_one:
+			mu.reset_scene()
+		x = start_x
+		dx = part_h / float(vn_arg)
+		verts = []
+		faces = []
+		print("start_x="+str(x) + " dx=" + str(dx))
+
+		for v_ind in range(0, vn_arg + 1):
+			cur_r = cur_r_f(x)
+			#print("x=" + str(x) + ", cur_r = " + str(cur_r))
+			cur_verts = mu.get_circle_verts((0,0,x), cur_r, n)
+			cur_n_verts = len(verts)
+			verts += cur_verts
+			x += dx
+
+			if v_ind > 0:
+				base_low = (v_ind - 1) * n
+				for i in range(0, n):
+					next_i = base_low + (i + 1) % n
+					#print(base_low)
+					faces.append([ base_low + i, next_i, next_i + n,
+								base_low + i + n ])
+
+		print("final x="+str(x) + " final r = " + str(cur_r))
+		print("n_verts="+str(len(verts)))
+		#print(faces)
+		faces.append(range(0,n))
+		if cur_r:
+			faces.append(range((vn_arg) * n, (vn_arg + 1) * n))
+		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
+		if not all_in_one:
+			bpy.ops.export_mesh.stl(filepath=mk_file_path(self.get_fname(), part_name),ascii=False)
+
+# three-part part piece
+class Piece3(Piece):
+	def __init__(self):
+		super().__init__()
 		self.rq = 0.5 # ratio piece base top to bottom radius
 		self.base_top_r = r * self.rq
 		self.base_h = h * self.base_q()
 		self.middle_h = h * self.middle_q()
+
 	def top_q(self):
 		return 1.0 - self.base_q() - self.middle_q()
 
-class Pawn(Piece):
+	def make_base(self, all_in_one):
+		self.make_conic_part(0, self.base_h, self.vn_base, self.base_cur_r,
+												"base", all_in_one)
+
+	def make_top(self, all_in_one):
+		self.make_conic_part(self.middle_h + self.base_h, self.top_h, self.vn_top,
+												self.top_cur_r, "top", all_in_one)
+
+	def make_middle(self, all_in_one):
+		self.make_conic_part(self.base_h, self.middle_h, self.vn_middle,
+												self.middle_cur_r, "middle", all_in_one)
+
+	def make(self):
+		for all_in_one in [False, True]:
+			mu.reset_scene()
+			self.make_base(all_in_one)
+			self.make_middle(all_in_one)
+			self.make_top(all_in_one)
+		bpy.ops.export_mesh.stl(filepath=self.get_fname(), ascii=False)
+
+class Pawn(Piece3):
 	def __init__(self):
 		super().__init__()
 		self.bend_rq = 0.6 # ratio of bend_top_r to base_top_r
@@ -76,6 +141,8 @@ class Pawn(Piece):
 		self.vn_middle = int(vn * self.middle_q())
 		self.vn_top = int(vn * self.top_q())
 
+	def get_piece_name(self):
+		return "Pawn"
 	def base_q(self):
 		return 0.25
 	def middle_q(self):
@@ -111,60 +178,25 @@ class Pawn(Piece):
 		else:
 			return 0
 
-	def make_pawn_part(self, start_x, part_h, vn_arg, cur_r_f, part_name, all_in_one = False):
-		if not all_in_one:
-			mu.reset_scene()
-		x = start_x
-		dx = part_h / float(vn_arg)
-		verts = []
-		faces = []
-		print("start_x="+str(x) + " dx=" + str(dx))
 
-		for v_ind in range(0, vn_arg + 1):
-			cur_r = cur_r_f(x)
-			#print("x=" + str(x) + ", cur_r = " + str(cur_r))
-			cur_verts = mu.get_circle_verts((0,0,x), cur_r, n)
-			cur_n_verts = len(verts)
-			verts += cur_verts
-			x += dx
+class Bishop(Piece):
+	def __init__(self):
+		super().__init__()
+		self.middle_top_r = self.middle_cur_r(self.middle_h + self.base_h)
+		self.top_h = h - self.base_h - self.middle_h
+		self.top_r = ( self.top_h * self.top_h  + \
+			self.middle_top_r * self.middle_top_r) / (2.0 * self.top_h)
 
-			if v_ind > 0:
-				base_low = (v_ind - 1) * n
-				for i in range(0, n):
-					next_i = base_low + (i + 1) % n
-					#print(base_low)
-					faces.append([ base_low + i, next_i, next_i + n,
-								base_low + i + n ])
+		self.vn_base = int(vn * self.base_q())
+		self.vn_middle = int(vn * self.middle_q())
+		self.vn_top = int(vn * self.top_q())
 
-		print("final x="+str(x) + " final r = " + str(cur_r))
-		print("n_verts="+str(len(verts)))
-		#print(faces)
-		faces.append(range(0,n))
-		if cur_r:
-			faces.append(range((vn_arg) * n, (vn_arg + 1) * n))
-		mu.create_mesh_from_data('Pawn ' + part_name, o_v, verts, faces, True)
-		if not all_in_one:
-			bpy.ops.export_mesh.stl(filepath=mk_file_path(args.save, part_name),ascii=False)
-
-	def make_pawn_base(self, all_in_one):
-		self.make_pawn_part(0, self.base_h, self.vn_base, self.base_cur_r,
-												"base", all_in_one)
-
-	def make_pawn_top(self, all_in_one):
-		self.make_pawn_part(self.middle_h + self.base_h, self.top_h, self.vn_top,
-												self.top_cur_r, "top", all_in_one)
-
-	def make_pawn_middle(self, all_in_one):
-		self.make_pawn_part(self.base_h, self.middle_h, self.vn_middle,
-												self.middle_cur_r, "middle", all_in_one)
-
-	def make(self):
-		for all_in_one in [False, True]:
-			mu.reset_scene()
-			self.make_pawn_base(all_in_one)
-			self.make_pawn_middle(all_in_one)
-			self.make_pawn_top(all_in_one)
-		bpy.ops.export_mesh.stl(filepath='pawn.stl', ascii=False)
+	def get_piece_name(self):
+		return "Bishop"
+	def base_q(self):
+		return 0.25
+	def middle_q(self):
+		return 0.4
 
 args = get_args()
 
