@@ -83,21 +83,37 @@ class Piece:
 class Piece3(Piece):
 	def __init__(self):
 		super().__init__()
-		self.rq = 0.5 # ratio piece base top to bottom radius
-		self.base_top_r = r * self.rq
 		self.base_h = h * self.base_q()
 		self.middle_h = h * self.middle_q()
+		self.top_h = h * self.total_q() - self.base_h - self.middle_h
+		self.rq = 0.5 # ratio piece base top to bottom radius
+		self.base_top_r = r * self.rq
+		self.bend_h = self.base_h + self.middle_h * self.bend_q()
+		self.bend_r = self.base_top_r * self.bend_rq()
 		self.vn_base = int(vn * self.base_q())
 		self.vn_middle = int(vn * self.middle_q())
 		self.vn_top = int(vn * self.top_q())
-		self.top_h = h * self.total_q() - self.base_h - self.middle_h
+		self.middle_top_r = self.middle_cur_r(self.middle_h + self.base_h)
 
+	def bend_rq(self):
+		return 0.6
+	def bend_q(self):
+		return 0.7
 	# used for stretching piece
 	# in particular pawns should be shorter than other pieces
 	def total_q(self):
 		return 1.0
 	def top_q(self):
 		return self.total_q() - self.base_q() - self.middle_q()
+	def base_cur_r(self, x):
+		return (self.base_top_r - r)/(self.base_h * self.base_h) * x * x + r
+	def middle_cur_r(self, x):
+		if x > self.bend_h:
+			return self.bend_r
+		return (self.base_top_r - self.bend_r) / \
+			((self.base_h - self.bend_h) * \
+			(self.base_h - self.bend_h)) * (x - self.bend_h) \
+		* (x - self.bend_h) + self.bend_r
 
 	def make_base(self, all_in_one):
 		self.make_conic_part(0, self.base_h, self.vn_base, self.base_cur_r,
@@ -122,11 +138,6 @@ class Piece3(Piece):
 class Pawn(Piece3):
 	def __init__(self):
 		super().__init__()
-		self.bend_rq = 0.6 # ratio of bend_top_r to base_top_r
-		self.bend_q = 0.7
-		self.bend_h = self.base_h + self.middle_h * self.bend_q
-		self.bend_r = self.base_top_r * self.bend_rq
-		self.middle_top_r = self.middle_cur_r(self.middle_h + self.base_h)
 
 		# top_shift_h + top_r = top_h
 		# top_shift_h ^ 2 + middle_top_r ^ 2 = top_r ^ 2
@@ -151,23 +162,6 @@ class Pawn(Piece3):
 	def middle_q(self):
 		return 0.4
 
-	def base_cur_r(self, x):
-		return (self.base_top_r - r)/(self.base_h * self.base_h) * x * x + r
-
-	# f(base_h) = base_top_r
-	# f(bend_h) = bend_r
-	# f(x) = a * (x - bend_h)^2 + bend_r
-	# a * (base_h - bend_h) ^ 2 + bend_r = base_top_r
-	# a * (base_h - bend_h) ^ 2 = base_top_r - bend_r
-	# a = (base_top_r - bend_r) / (base_h - bend_h) ^ 2
-	def middle_cur_r(self, x):
-		if x > self.bend_h:
-			return self.bend_r
-		return (self.base_top_r - self.bend_r) / \
-			((self.base_h - self.bend_h) * \
-			(self.base_h - self.bend_h)) * (x - self.bend_h) \
-		* (x - self.bend_h) + self.bend_r
-
 	# top_shift_h + top_r = top_h
 	# (top_shift_h + top_r) = 2 * top_r * top_ball_q
 	# top_h = 2 * top_r * top_ball_q
@@ -186,31 +180,17 @@ class Pawn(Piece3):
 class Bishop(Piece3):
 	def __init__(self):
 		super().__init__()
-		self.bend_rq = 0.6 # ratio of bend_top_r to base_top_r
-		self.bend_q = 0.7
 		self.sin_q = 2.0
 		# joint point of sinusoides
 		self.sin_joint_h =  self.top_h *  1.0/(self.sin_q + 1.0)
 		print("sin_joint_h="+str(self.sin_joint_h))
 		self.top_max_rq = 1.5
-		self.bend_r = self.base_top_r * self.bend_rq
 		self.top_max_r = self.bend_r * self.top_max_rq
-		self.bend_h = self.base_h + self.middle_h * self.bend_q
-		self.middle_top_r = self.middle_cur_r(self.middle_h + self.base_h)
 		self.sin_k = math.pi / (2.0*self.sin_joint_h)
 		self.shift_top_x = math.asin(self.bend_r / self.top_max_r) / self.sin_k
 		self.top_h = h * (self.total_q() - self.base_q() - \
 			self.middle_q()) - self.shift_top_x
 
-	def base_cur_r(self, x):
-		return (self.base_top_r - r)/(self.base_h * self.base_h) * x * x + r
-	def middle_cur_r(self, x):
-		if x > self.bend_h:
-			return self.bend_r
-		return (self.base_top_r - self.bend_r) / \
-			((self.base_h - self.bend_h) * \
-			(self.base_h - self.bend_h)) * (x - self.bend_h) \
-		* (x - self.bend_h) + self.bend_r
 	def top_cur_r(self,x):
 		x -= self.base_h + self.middle_h - self.shift_top_x
 		#print("x=" + str(x))
@@ -227,6 +207,17 @@ class Bishop(Piece3):
 		return 0.3
 	def middle_q(self):
 		return 0.5
+
+class RoyalPiece(Piece3):
+	def __init__(self):
+		super().__init__()
+	def total_q(self):
+		return 1.4
+	def base_q(self):
+		return 0.3
+	def middle_q(self):
+		return 0.7
+
 
 args = get_args()
 
