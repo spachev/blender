@@ -211,13 +211,29 @@ class Bishop(Piece3):
 class RoyalPiece(Piece3):
 	def __init__(self):
 		super().__init__()
+		self.funnel_h = self.top_h * self.funnel_q()
+		self.funnel_r = self.bend_r * self.funnel_rq()
 	def total_q(self):
 		return 1.4
 	def base_q(self):
 		return 0.3
 	def middle_q(self):
 		return 0.7
+	def funnel_q(self):
+		return 0.5
+	def funnel_rq(self):
+		return 1.5
+	def top_cur_r(self, x):
+		x -= self.base_h + self.middle_h
+		if x < self.funnel_h:
+			return self.bend_r + x * (self.funnel_r - self.bend_r) / self.funnel_h
+		return 0.0
 
+class King(RoyalPiece):
+	def __init__(self):
+		super().__init__()
+	def get_piece_name(self):
+		return "King"
 
 args = get_args()
 
@@ -235,4 +251,5 @@ pawn = Pawn()
 pawn.make()
 bishop = Bishop()
 bishop.make()
-
+king = King()
+king.make()
