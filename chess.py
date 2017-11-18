@@ -213,8 +213,9 @@ class RoyalPiece(Piece3):
 		super().__init__()
 		self.funnel_h = self.top_h * self.funnel_q()
 		self.funnel_r = self.bend_r * self.funnel_rq()
+		self.crown_r = self.bend_r * self.crown_rq()
 	def total_q(self):
-		return 1.4
+		return 1.3
 	def base_q(self):
 		return 0.3
 	def middle_q(self):
@@ -222,18 +223,34 @@ class RoyalPiece(Piece3):
 	def funnel_q(self):
 		return 0.5
 	def funnel_rq(self):
-		return 1.5
+		return 1.6
+	def crown_rq(self):
+		return 0.8
 	def top_cur_r(self, x):
 		x -= self.base_h + self.middle_h
 		if x < self.funnel_h:
 			return self.bend_r + x * (self.funnel_r - self.bend_r) / self.funnel_h
-		return 0.0
+		return self.crown_cur_r(x)
 
 class King(RoyalPiece):
 	def __init__(self):
 		super().__init__()
 	def get_piece_name(self):
 		return "King"
+	def crown_cur_r(self, x):
+		return self.crown_r * (self.top_h - x)/(self.top_h - self.funnel_h)
+
+class Queen(RoyalPiece):
+	def __init__(self):
+		super().__init__()
+		self.crown_r = self.top_h - self.funnel_h
+	def get_piece_name(self):
+		return "Queen"
+	def funnel_q(self):
+		return 0.7
+	def crown_cur_r(self, x):
+		x -= self.funnel_h
+		return math.sqrt(self.crown_r * self.crown_r - x * x)
 
 args = get_args()
 
@@ -253,3 +270,5 @@ bishop = Bishop()
 bishop.make()
 king = King()
 king.make()
+queen = Queen()
+queen.make()
