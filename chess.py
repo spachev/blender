@@ -44,6 +44,54 @@ class Piece:
 	def get_fname(self):
 		return self.get_piece_name().lower() + ".stl"
 
+	def save_part(self, part_name):
+		bpy.ops.export_mesh.stl(filepath=mk_file_path(self.get_fname(), part_name),ascii=False)
+
+	def make_ring_part(self, start_x, part_h, vn_arg, cur_outer_r_f, cur_inner_r_f,
+										 part_name, all_in_one = False):
+		if not all_in_one:
+			mu.reset_scene()
+		x = start_x
+		dx = part_h / float(vn_arg)
+		verts = []
+		faces = []
+		print("start_x="+str(x) + " dx=" + str(dx))
+
+		for v_ind in range(0, vn_arg + 1):
+			cur_inner_r = cur_inner_r_f(x)
+			cur_outer_r = cur_outer_r_f(x)
+			#print("x=" + str(x) + ", cur_inner_r = " + str(cur_inner_r) +
+			#	", cur_outer_r = " + str(cur_outer_r))
+			cur_inner_verts = mu.get_circle_verts((0,0,x), cur_inner_r, n)
+			cur_outer_verts = mu.get_circle_verts((0,0,x), cur_outer_r, n)
+			#cur_n_verts = len(verts)
+			verts += cur_outer_verts + cur_inner_verts
+			x += dx
+
+			if v_ind > 0:
+				outer_base_low = (v_ind - 1) * 2 * n
+				inner_base_low = outer_base_low + n
+				for i in range(0, n):
+					outer_next_i = outer_base_low + (i + 1) % n
+					inner_next_i = inner_base_low + (i + 1) % n
+					#print(base_low)
+					faces.append([ outer_base_low + i, outer_next_i, outer_next_i + n,
+								outer_base_low + i + n ])
+					faces.append([ inner_base_low + i + n, inner_next_i + n,
+											 inner_next_i, inner_base_low + i])
+
+		print("final x="+str(x) + " final r = " + str(cur_outer_r))
+		print("n_verts="+str(len(verts)))
+		#print(faces)
+		if cur_outer_r:
+			outer_base = vn_arg * 2 * n
+			inner_base = outer_base + n
+			faces.append(list(range(outer_base, outer_base + n)) +
+				list(range(inner_base + n - 1, inner_base - 1, -1)))
+		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
+		if not all_in_one:
+			self.save_part(part_name)
+
 	def make_conic_part(self, start_x, part_h, vn_arg, cur_r_f, part_name, all_in_one = False):
 		if not all_in_one:
 			mu.reset_scene()
@@ -77,7 +125,7 @@ class Piece:
 			faces.append(range((vn_arg) * n, (vn_arg + 1) * n))
 		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
 		if not all_in_one:
-			bpy.ops.export_mesh.stl(filepath=mk_file_path(self.get_fname(), part_name),ascii=False)
+			self.save_part(part_name)
 
 # three-part part piece
 class Piece3(Piece):
@@ -135,6 +183,7 @@ class Piece3(Piece):
 			self.make_top(all_in_one)
 		bpy.ops.export_mesh.stl(filepath=self.get_fname(), ascii=False)
 
+# real pawn: h = 30
 class Pawn(Piece3):
 	def __init__(self):
 		super().__init__()
@@ -177,6 +226,7 @@ class Pawn(Piece3):
 
 # real bishop: top_max_r = 6
 # bend_r = 4
+# h = 48
 class Bishop(Piece3):
 	def __init__(self):
 		super().__init__()
@@ -252,6 +302,45 @@ class Queen(RoyalPiece):
 		x -= self.funnel_h
 		return math.sqrt(self.crown_r * self.crown_r - x * x)
 
+# real rook: h = 36
+class Rook(Piece3):
+	def __init__(self):
+		super().__init__()
+		self.top_r = self.bend_r * self.top_rq()
+		self.pit_r = self.bend_r * (self.top_rq() - self.top_wall_rq())
+		self.pit_h = self.top_h * self.top_pit_q()
+		self.top_d_pit = self.top_h - self.pit_h
+	def get_piece_name(self):
+		return "Rook"
+	def total_q(self):
+		return 1.1
+	def base_q(self):
+		return 0.3
+	def middle_q(self):
+		return 0.6
+	def top_rq(self):
+		return 1.5
+	def top_wall_rq(self):
+		return 0.3
+	def top_pit_q(self):
+		return 0.9
+	def bend_rq(self):
+		return 0.8
+	def top_cur_r(self, x):
+		return self.top_r
+	def pit_cur_r(self, x):
+		return self.pit_r
+	def make_top(self, all_in_one):
+		if not all_in_one:
+			mu.reset_scene()
+		self.make_conic_part(self.base_h + self.middle_h, self.top_d_pit, self.vn_top,
+			self.top_cur_r, "pitbottom", True)
+		self.make_ring_part(self.base_h + self.middle_h + self.top_d_pit, self.pit_h,
+			self.vn_top,
+			self.top_cur_r, self.pit_cur_r, "pit", True)
+		if not all_in_one:
+			self.save_part("top")
+
 args = get_args()
 
 origin = (0,0,0)
@@ -272,3 +361,5 @@ king = King()
 king.make()
 queen = Queen()
 queen.make()
+rook = Rook()
+rook.make()
