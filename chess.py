@@ -75,9 +75,10 @@ class Piece:
 					outer_next_i = outer_base_low + (i + 1) % n
 					inner_next_i = inner_base_low + (i + 1) % n
 					#print(base_low)
-					faces.append([ outer_base_low + i, outer_next_i, outer_next_i + n,
-								outer_base_low + i + n ])
-					faces.append([ inner_base_low + i + n, inner_next_i + n,
+					outer_face = [ outer_base_low + i, outer_next_i, outer_next_i + 2 * n,
+								outer_base_low + i + 2 * n ]
+					faces.append(outer_face)
+					faces.append([ inner_base_low + i + 2 * n, inner_next_i + 2 * n,
 											 inner_next_i, inner_base_low + i])
 
 		print("final x="+str(x) + " final r = " + str(cur_outer_r))
@@ -86,8 +87,10 @@ class Piece:
 		if cur_outer_r:
 			outer_base = vn_arg * 2 * n
 			inner_base = outer_base + n
-			faces.append(list(range(outer_base, outer_base + n)) +
-				list(range(inner_base + n - 1, inner_base - 1, -1)))
+			for i in range(0, n):
+				i_next = (i + 1) % n
+				faces.append([outer_base + i, outer_base + i_next,
+										 inner_base + i_next, inner_base + i ])
 		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
 		if not all_in_one:
 			self.save_part(part_name)
@@ -323,7 +326,7 @@ class Rook(Piece3):
 	def top_wall_rq(self):
 		return 0.3
 	def top_pit_q(self):
-		return 0.9
+		return 0.4
 	def bend_rq(self):
 		return 0.8
 	def top_cur_r(self, x):
