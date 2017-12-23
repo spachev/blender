@@ -59,6 +59,30 @@ def get_circle_verts(o,r,n):
 
 	return verts
 
+def extend_poly(poly, target_n):
+	n_poly = len(poly)
+	if n_poly > target_n:
+		raise Exception("Polygon has too many verts")
+	verts_per_side = target_n // n_poly
+	if target_n % n_poly:
+		verts_per_side += 1
+	new_poly = []
+	for i in range(0, n_poly):
+		v1 = poly[i]
+		v2 = poly[(i + 1) % n_poly]
+		dv = [0, 0, 0]
+		for j in range(0,3):
+			dv[j] = (v2[j] - v1[j]) / verts_per_side
+		for k in range(0, verts_per_side):
+			v = [0, 0, 0]
+			for j in range(0,3):
+				v[j] = v1[j] + k * dv[j]
+			new_poly.append(v)
+			if len(new_poly) == target_n:
+				return new_poly
+	raise Exception("Bug: should never get here: len(new_poly) = " + str(len(new_poly)))
+
+
 def reset_scene():
 	scn = bpy.context.scene
 	obs = scn.objects

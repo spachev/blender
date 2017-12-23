@@ -95,6 +95,33 @@ class Piece:
 		if not all_in_one:
 			self.save_part(part_name)
 
+	def make_prismic_part(self, start_x, part_h, vn_arg, cur_poly_f, part_name, all_in_one = False):
+		if not all_in_one:
+			mu.reset_scene()
+		n_poly = None
+		x = start_x
+		dx = part_h / float(vn_arg)
+		verts = []
+		faces = []
+
+		for v_ind in range(0, vn_arg + 1):
+			cur_poly = cur_poly_f(x)
+			verts += cur_poly
+			x += dx
+			if n_poly == None:
+				n_poly = len(cur_poly)
+			if v_ind > 0:
+				base_low = (v_ind - 1) * n_poly
+				for i in range(0, n_poly):
+					next_i = base_low + (i + 1) % n_poly
+					faces.append([ base_low + i, next_i, next_i + n_poly,
+								base_low + i + n_poly ])
+		faces.append(range(0, n_poly))
+		faces.append(range((vn_arg) * n_poly, (vn_arg + 1) * n_poly))
+		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
+		if not all_in_one:
+			self.save_part(part_name)
+
 	def make_conic_part(self, start_x, part_h, vn_arg, cur_r_f, part_name, all_in_one = False):
 		if not all_in_one:
 			mu.reset_scene()
@@ -227,6 +254,63 @@ class Pawn(Piece3):
 		else:
 			return 0
 
+class Knight(Piece3):
+	def __init__(self):
+		super().__init__()
+		self.base_poly_d = self.base_top_r / math.sqrt(2)
+		self.poly_n = n
+		self.support_h = self.middle_h * self.support_q()
+		self.support_rq = 0.7
+		self.support_r = self.support_rq * self.base_top_r
+		self.top_dq = 0.5
+		self.top_poly_d = self.base_poly_d * self.top_dq
+
+	def get_piece_name(self):
+		return "Knight"
+	def support_q(self):
+		return 0.1
+	def total_q(self):
+		return 1.1
+	def base_q(self):
+		return 0.4
+	def middle_q(self):
+		return 0.5
+
+	def middle_cur_poly(self, z):
+		if z < self.base_h + self.support_h:
+			return mu.get_circle_verts((0, 0, z), self.support_r, self.poly_n)
+		dz = z - self.base_h
+		dx = self.base_poly_d * dz/self.middle_h
+		#dy = (self.base_poly_d - self.top_poly_d) * (z - self.base_h)/self.middle_h
+		k = self.top_poly_d /(self.middle_h * self.middle_h)
+		dy = -(self.middle_h - dz) ** 2  * k
+		#dy = 20.0
+		print("z=" + str(z) + " dy=" + str(dy))
+		return mu.extend_poly([
+														[self.base_poly_d, self.base_poly_d - dy, z],
+														[self.base_poly_d, -self.base_poly_d + dy, z],
+														[-self.base_poly_d + dx, -self.base_poly_d + dy, z] ,
+														[-self.base_poly_d + dx, self.base_poly_d - dy, z]
+													], self.poly_n)
+
+	def top_cur_poly(self, z):
+		dx = -self.base_top_r / 2.0 + self.base_poly_d * (z - self.base_h - self.middle_h)/self.top_h
+		return mu.extend_poly(
+			[
+				[self.base_poly_d, self.base_poly_d, z], [self.base_poly_d, -self.base_poly_d, z],
+				[-self.base_poly_d + dx, -self.base_poly_d, z] ,
+				[-self.base_poly_d + dx, self.base_poly_d, z]
+		], self.poly_n)
+
+	def make_top(self, all_in_one):
+		self.make_prismic_part(self.middle_h + self.base_h, self.top_h, self.vn_top,
+												self.top_cur_poly, "top", all_in_one)
+
+	def make_middle(self, all_in_one):
+		self.make_prismic_part(self.base_h, self.middle_h, self.vn_middle,
+												self.middle_cur_poly, "middle", all_in_one)
+
+
 # real bishop: top_max_r = 6
 # bend_r = 4
 # h = 48
@@ -356,13 +440,16 @@ n = int(args.num_parts)
 vn = int(args.num_vparts)
 piece = args.piece
 
-pawn = Pawn()
-pawn.make()
-bishop = Bishop()
-bishop.make()
-king = King()
-king.make()
-queen = Queen()
-queen.make()
-rook = Rook()
-rook.make()
+knight = Knight()
+knight.make()
+if False:
+	pawn = Pawn()
+	pawn.make()
+	bishop = Bishop()
+	bishop.make()
+	king = King()
+	king.make()
+	queen = Queen()
+	queen.make()
+	rook = Rook()
+	rook.make()
