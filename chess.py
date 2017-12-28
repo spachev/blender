@@ -262,8 +262,13 @@ class Knight(Piece3):
 		self.support_h = self.middle_h * self.support_q()
 		self.support_rq = 0.7
 		self.support_r = self.support_rq * self.base_top_r
-		self.top_dq = 0.5
+		self.top_dq = 0.2
 		self.top_poly_d = self.base_poly_d * self.top_dq
+		self.middle_bend_q = 0.3
+		self.middle_bend_h = self.middle_h * self.middle_bend_q
+		self.bend_dq = 1.3
+		self.bend_poly_d = self.base_poly_d * self.bend_dq
+		self.bend_h2 = self.middle_h - self.middle_bend_h
 
 	def get_piece_name(self):
 		return "Knight"
@@ -272,20 +277,27 @@ class Knight(Piece3):
 	def total_q(self):
 		return 1.1
 	def base_q(self):
-		return 0.4
+		return 0.3
 	def middle_q(self):
-		return 0.5
+		return 0.6
 
 	def middle_cur_poly(self, z):
 		if z < self.base_h + self.support_h:
 			return mu.get_circle_verts((0, 0, z), self.support_r, self.poly_n)
 		dz = z - self.base_h
-		dx = self.base_poly_d * dz/self.middle_h
+		#dx = self.base_poly_d * dz/self.middle_h
+		if dz < self.middle_bend_h:
+			kx = (self.bend_poly_d - self.top_poly_d) /(self.middle_bend_h * self.middle_bend_h)
+			dx = ((dz - self.middle_bend_h) ** 2)  * kx
+		else:
+			kx = (self.bend_poly_d - self.top_poly_d) /(self.bend_h2 * self.bend_h2)
+			dx = ((dz - self.middle_bend_h) ** 2)  * kx
 		#dy = (self.base_poly_d - self.top_poly_d) * (z - self.base_h)/self.middle_h
-		k = self.top_poly_d /(self.middle_h * self.middle_h)
-		dy = -(self.middle_h - dz) ** 2  * k
+		ky = self.top_poly_d /(self.middle_h * self.middle_h)
+		dy = -(self.middle_h - dz) ** 2  * ky
 		#dy = 20.0
-		print("z=" + str(z) + " dy=" + str(dy))
+		print("z=" + str(z) + " dy=" + str(dy) + " dx=" + str(dx) +
+			" middle_bend_h=" + str(self.middle_bend_h))
 		return mu.extend_poly([
 														[self.base_poly_d, self.base_poly_d - dy, z],
 														[self.base_poly_d, -self.base_poly_d + dy, z],
