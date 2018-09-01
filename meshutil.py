@@ -89,6 +89,16 @@ def reset_scene():
 	for ob in obs:
 		obs.unlink(ob)
 
+def connect_circles(c1, c2, rev):
+	faces = []
+	if rev:
+		c1,c2 = c2,c1
+	#print("connect circles: len1 = " + str(len(c1)) + " len2 = " + str(len(c2)))
+	for i,v in enumerate(c1):
+		faces.append([v, c1[(i + 1) % len(c1)], c2[(i + 1) % len(c2)], c2[i]])
+	#print(faces)
+	return faces
+
 def create_mesh_from_data(name, origin, verts, faces, remove_cube=True):
 	me = bpy.data.meshes.new(name+'Mesh')
 	ob = bpy.data.objects.new(name, me)

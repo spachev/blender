@@ -24,6 +24,7 @@ def get_args():
 	parser.add_argument('--radius', help="radius",  required=True)
 	parser.add_argument('--height', help="height", required=True)
 	parser.add_argument('--thickness', help="thickness", required=True)
+	parser.add_argument('--edge-w', help="edge width", required=True)
 	parser.add_argument('--num-parts', help="number of circle segements", required=True)
 	parser.add_argument('--num-vparts', help="number of vertical segements", required=True)
 	parser.add_argument('--piece', help='chess piece name', required=True)
@@ -125,11 +126,27 @@ class Piece:
 	def make_conic_part(self, start_x, part_h, vn_arg, cur_r_f, part_name, all_in_one = False):
 		if not all_in_one:
 			mu.reset_scene()
+		for d in [0, th]:
+			cone_edge_w = edge_w - d
+			if d == 0:
+				part_name_ident = part_name
+				drop_down_h = d
+			else:
+				part_name_ident = part_name + " inner"
+				drop_down_h = 0
+			self.make_conic_part_low(start_x + d, part_h - 2 * d, vn_arg,
+															 lambda x: cur_r_f(x + d) - d, part_name_ident,
+															 d > 0, cone_edge_w, drop_down_h)
+		if not all_in_one:
+			self.save_part(part_name)
+
+	def make_conic_part_low(self, start_x, part_h, vn_arg, cur_r_f, part_name, rev_faces,
+			cone_edge_w, drop_down_h):
 		x = start_x
 		dx = part_h / float(vn_arg)
 		verts = []
 		faces = []
-		print("start_x="+str(x) + " dx=" + str(dx))
+		print("part_name = " + part_name + " start_x="+str(x) + " dx=" + str(dx))
 
 		for v_ind in range(0, vn_arg + 1):
 			cur_r = cur_r_f(x)
@@ -144,18 +161,48 @@ class Piece:
 				for i in range(0, n):
 					next_i = base_low + (i + 1) % n
 					#print(base_low)
-					faces.append([ base_low + i, next_i, next_i + n,
-								base_low + i + n ])
+					face = [ base_low + i, next_i, next_i + n,
+								base_low + i + n ]
+					if rev_faces:
+						face.reverse()
+					faces.append(face)
 
 		print("final x="+str(x) + " final r = " + str(cur_r))
 		print("n_verts="+str(len(verts)))
 		#print(faces)
-		faces.append(range(0,n))
+		bottom_outer_verts = list(range(0,n))
+		bottom_inner_verts = list(range(len(verts), len(verts) + n))
+		verts += mu.get_circle_verts((0, 0, start_x), cur_r_f(start_x) - cone_edge_w, n)
+		bottom_edge_faces = mu.connect_circles(bottom_outer_verts, bottom_inner_verts, rev_faces)
+		faces += bottom_edge_faces
+		top_inner_verts = None
+
 		if cur_r:
-			faces.append(range((vn_arg) * n, (vn_arg + 1) * n))
+			top_outer_verts = list(range((vn_arg) * n, (vn_arg + 1) * n))
+			if cur_r > edge_w:
+				top_inner_verts = list(range(len(verts), len(verts) + n))
+				verts += mu.get_circle_verts((0, 0, x), cur_r - cone_edge_w, n)
+				top_edge_faces = mu.connect_circles(top_outer_verts, top_inner_verts, rev_faces)
+				faces += top_edge_faces
+			else:
+				if rev_faces:
+					top_outer_verts.reverse()
+				faces.append(top_outer_verts)
+
+		if drop_down_h > 0:
+			bottom_drop_verts = list(range(len(verts), len(verts) + n))
+			verts += mu.get_circle_verts((0, 0, x - drop_down_h), cur_r - cone_edge_w, n)
+			bottom_drop_faces = mu.connect_circles(bottom_drop_verts, bottom_inner_verts, 0)
+			faces += bottom_drop_faces
+			if top_inner_verts:
+				top_drop_verts = list(range(len(verts), len(verts) + n))
+				verts += mu.get_circle_verts((0, 0, start_x + drop_down_h),
+					cur_r_f(start_x + drop_down_h) - cone_edge_w, n)
+				top_drop_faces = mu.connect_circles(top_drop_verts, top_inner_verts, 1)
+				faces += bottom_drop_faces
+
+		print("n_faces="+str(len(faces)))
 		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
-		if not all_in_one:
-			self.save_part(part_name)
 
 # three-part part piece
 class Piece3(Piece):
@@ -164,8 +211,7 @@ class Piece3(Piece):
 		self.base_h = h * self.base_q()
 		self.middle_h = h * self.middle_q()
 		self.top_h = h * self.total_q() - self.base_h - self.middle_h
-		self.rq = 0.5 # ratio piece base top to bottom radius
-		self.base_top_r = r * self.rq
+		self.base_top_r = r * self.top_base_rq()
 		self.bend_h = self.base_h + self.middle_h * self.bend_q()
 		self.bend_r = self.base_top_r * self.bend_rq()
 		self.vn_base = int(vn * self.base_q())
@@ -173,6 +219,8 @@ class Piece3(Piece):
 		self.vn_top = int(vn * self.top_q())
 		self.middle_top_r = self.middle_cur_r(self.middle_h + self.base_h)
 
+	def top_base_rq(self):
+		return 0.5
 	def bend_rq(self):
 		return 0.6
 	def bend_q(self):
@@ -262,7 +310,7 @@ class Knight(Piece3):
 		self.support_h = self.middle_h * self.support_q()
 		self.support_rq = 0.7
 		self.support_r = self.support_rq * self.base_top_r
-		self.top_dq = 0.2
+		self.top_dq = 0.6
 		self.top_poly_d = self.base_poly_d * self.top_dq
 		self.middle_bend_q = 0.3
 		self.middle_bend_h = self.middle_h * self.middle_bend_q
@@ -274,12 +322,14 @@ class Knight(Piece3):
 		return "Knight"
 	def support_q(self):
 		return 0.1
+	def top_base_rq(self):
+		return 0.7
 	def total_q(self):
 		return 1.1
 	def base_q(self):
-		return 0.3
+		return 0.2
 	def middle_q(self):
-		return 0.6
+		return 0.75
 
 	def middle_cur_poly(self, z):
 		if z < self.base_h + self.support_h:
@@ -289,29 +339,32 @@ class Knight(Piece3):
 		if dz < self.middle_bend_h:
 			kx = (self.bend_poly_d - self.top_poly_d) /(self.middle_bend_h * self.middle_bend_h)
 			dx = ((dz - self.middle_bend_h) ** 2)  * kx
+			dx_back = dx/2.0
 		else:
 			kx = (self.bend_poly_d - self.top_poly_d) /(self.bend_h2 * self.bend_h2)
 			dx = ((dz - self.middle_bend_h) ** 2)  * kx
+			dx_back = dx/2.0
 		#dy = (self.base_poly_d - self.top_poly_d) * (z - self.base_h)/self.middle_h
-		ky = self.top_poly_d /(self.middle_h * self.middle_h)
-		dy = -(self.middle_h - dz) ** 2  * ky
+		ky = (self.base_poly_d - self.top_poly_d)
+		dy = math.sqrt(dz/self.middle_h)  * ky
 		#dy = 20.0
 		print("z=" + str(z) + " dy=" + str(dy) + " dx=" + str(dx) +
 			" middle_bend_h=" + str(self.middle_bend_h))
 		return mu.extend_poly([
-														[self.base_poly_d, self.base_poly_d - dy, z],
-														[self.base_poly_d, -self.base_poly_d + dy, z],
+														[self.base_poly_d - dx_back, self.base_poly_d - dy, z],
+														[self.base_poly_d - dx_back, -self.base_poly_d + dy, z],
 														[-self.base_poly_d + dx, -self.base_poly_d + dy, z] ,
 														[-self.base_poly_d + dx, self.base_poly_d - dy, z]
 													], self.poly_n)
 
 	def top_cur_poly(self, z):
-		dx = -self.base_top_r / 2.0 + self.base_poly_d * (z - self.base_h - self.middle_h)/self.top_h
+		#dx = -self.base_top_r / 2.0 + self.base_poly_d * (z - self.base_h - self.middle_h)/self.top_h
+		dx = self.top_poly_d
 		return mu.extend_poly(
 			[
-				[self.base_poly_d, self.base_poly_d, z], [self.base_poly_d, -self.base_poly_d, z],
-				[-self.base_poly_d + dx, -self.base_poly_d, z] ,
-				[-self.base_poly_d + dx, self.base_poly_d, z]
+				[self.top_poly_d, self.top_poly_d, z], [self.top_poly_d, -self.top_poly_d, z],
+				[-self.top_poly_d - dx, -self.top_poly_d, z] ,
+				[-self.top_poly_d - dx, self.top_poly_d, z]
 		], self.poly_n)
 
 	def make_top(self, all_in_one):
@@ -450,10 +503,11 @@ r = float(args.radius)
 th = float(args.thickness)
 n = int(args.num_parts)
 vn = int(args.num_vparts)
+edge_w = float(args.edge_w)
 piece = args.piece
 
-knight = Knight()
-knight.make()
+pawn = Pawn()
+pawn.make()
 if False:
 	pawn = Pawn()
 	pawn.make()
