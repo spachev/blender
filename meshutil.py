@@ -45,11 +45,28 @@ def get_tp_prism_verts(o,l,w,h,dl,rot_x,rot_y,rot_z):
 	print(mat_rot)
 	return [v * mat_rot  for v in verts]
 
+def get_ell_arc_verts(o, n, w, l, start_theta, end_theta):
+	theta = start_theta
+	d_theta = (end_theta - start_theta) / float(n)
+	verts = []
+	while theta <= end_theta:
+		x = w * cos(theta)
+		y = l * sin(theta)
+		verts.append([x,y,o[2]])
+		theta += d_theta
+	return verts
+
+def get_combined_verts(o, n, w, l, path_gens):
+	verts = []
+	for pgen in path_gens:
+		verts += pgen(o, n, w, l)
+	return verts
+
 def get_circle_verts(o,r,n):
 	theta = 0
 	verts = []
 	pi2 = 2.0 * math.pi
-	d_theta = pi2 / n
+	d_theta = pi2 / float(n)
 
 	while theta < pi2:
 		x = o[0] + r * math.cos(theta)

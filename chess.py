@@ -27,7 +27,7 @@ def get_args():
 	parser.add_argument('--edge-w', help="edge width", required=True)
 	parser.add_argument('--num-parts', help="number of circle segements", required=True)
 	parser.add_argument('--num-vparts', help="number of vertical segements", required=True)
-	parser.add_argument('--piece', help='chess piece name', required=True)
+	parser.add_argument('--piece', help='chess piece name', required=False)
 	parsed_script_args, _ = parser.parse_known_args(script_args)
 	return parsed_script_args
 
@@ -44,6 +44,9 @@ class Piece:
 
 	def get_fname(self):
 		return self.get_piece_name().lower() + ".stl"
+
+	def get_edge_w(self, x):
+		return edge_w
 
 	def save_part(self, part_name):
 		bpy.ops.export_mesh.stl(filepath=mk_file_path(self.get_fname(), part_name),ascii=False)
@@ -126,34 +129,39 @@ class Piece:
 	def make_conic_part(self, start_x, part_h, vn_arg, cur_r_f, part_name, all_in_one = False):
 		if not all_in_one:
 			mu.reset_scene()
-		for d in [0, th]:
-			cone_edge_w = edge_w - d
-			if d == 0:
-				part_name_ident = part_name
-				drop_down_h = d
-			else:
-				part_name_ident = part_name + " inner"
-				drop_down_h = 0
-			self.make_conic_part_low(start_x + d, part_h - 2 * d, vn_arg,
-															 lambda x: cur_r_f(x + d) - d, part_name_ident,
-															 d > 0, cone_edge_w, drop_down_h)
+		self.make_conic_part_low(start_x, part_h, vn_arg,
+															 cur_r_f, part_name)
 		if not all_in_one:
 			self.save_part(part_name)
 
-	def make_conic_part_low(self, start_x, part_h, vn_arg, cur_r_f, part_name, rev_faces,
-			cone_edge_w, drop_down_h):
+	def make_conic_part_low(self, start_x, part_h, vn_arg, cur_r_f, part_name):
 		x = start_x
 		dx = part_h / float(vn_arg)
+		top_x = start_x + part_h
 		verts = []
+		inner_verts = []
 		faces = []
+		inner_faces = []
+		outer_faces = []
+		top_inner_face = None
+		top_outer_face = None
+		bottom_inner_face = None
+		bottom_outer_face = None
 		print("part_name = " + part_name + " start_x="+str(x) + " dx=" + str(dx))
 
 		for v_ind in range(0, vn_arg + 1):
 			cur_r = cur_r_f(x)
+			if cur_r <= 0:
+				break
 			#print("x=" + str(x) + ", cur_r = " + str(cur_r))
 			cur_verts = mu.get_circle_verts((0,0,x), cur_r, n)
 			cur_n_verts = len(verts)
 			verts += cur_verts
+			inner_r = cur_r - self.get_edge_w(x)
+			if inner_r < 0:
+				inner_r = 0.0
+			cur_inner_verts = mu.get_circle_verts((0,0,x), inner_r, n)
+			inner_verts += cur_inner_verts
 			x += dx
 
 			if v_ind > 0:
@@ -163,43 +171,31 @@ class Piece:
 					#print(base_low)
 					face = [ base_low + i, next_i, next_i + n,
 								base_low + i + n ]
-					if rev_faces:
-						face.reverse()
+					inner_face = face.copy()
+					inner_face.reverse()
 					faces.append(face)
+					inner_faces.append(inner_face)
+
+		top_outer_face = list(range(0,n))
+		for i,f in enumerate(inner_faces):
+			for j,v in enumerate(f):
+				inner_faces[i][j] += len(verts)
+		top_inner_face = list(range(len(verts), len(verts) + n))
+		bottom_outer_face = list(range(len(verts) - n, len(verts)))
+		bottom_inner_face = list(range(2 * len(verts) - n, 2 * len(verts)))
+		verts += inner_verts
+		faces += inner_faces
+
+
+		if bottom_outer_face:
+			faces += mu.connect_circles(bottom_outer_face, bottom_inner_face, 0)
+		if top_outer_face:
+			faces += mu.connect_circles(top_outer_face, top_inner_face, 0)
 
 		print("final x="+str(x) + " final r = " + str(cur_r))
 		print("n_verts="+str(len(verts)))
-		#print(faces)
-		bottom_outer_verts = list(range(0,n))
-		bottom_inner_verts = list(range(len(verts), len(verts) + n))
-		verts += mu.get_circle_verts((0, 0, start_x), cur_r_f(start_x) - cone_edge_w, n)
-		bottom_edge_faces = mu.connect_circles(bottom_outer_verts, bottom_inner_verts, rev_faces)
-		faces += bottom_edge_faces
-		top_inner_verts = None
-
-		if cur_r:
-			top_outer_verts = list(range((vn_arg) * n, (vn_arg + 1) * n))
-			if cur_r > edge_w:
-				top_inner_verts = list(range(len(verts), len(verts) + n))
-				verts += mu.get_circle_verts((0, 0, x), cur_r - cone_edge_w, n)
-				top_edge_faces = mu.connect_circles(top_outer_verts, top_inner_verts, rev_faces)
-				faces += top_edge_faces
-			else:
-				if rev_faces:
-					top_outer_verts.reverse()
-				faces.append(top_outer_verts)
-
-		if drop_down_h > 0:
-			bottom_drop_verts = list(range(len(verts), len(verts) + n))
-			verts += mu.get_circle_verts((0, 0, x - drop_down_h), cur_r - cone_edge_w, n)
-			bottom_drop_faces = mu.connect_circles(bottom_drop_verts, bottom_inner_verts, 0)
-			faces += bottom_drop_faces
-			if top_inner_verts:
-				top_drop_verts = list(range(len(verts), len(verts) + n))
-				verts += mu.get_circle_verts((0, 0, start_x + drop_down_h),
-					cur_r_f(start_x + drop_down_h) - cone_edge_w, n)
-				top_drop_faces = mu.connect_circles(top_drop_verts, top_inner_verts, 1)
-				faces += bottom_drop_faces
+		#print("faces=" + str(faces))
+		#print("inner_faces=" + str(inner_faces))
 
 		print("n_faces="+str(len(faces)))
 		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
@@ -288,14 +284,18 @@ class Pawn(Piece3):
 		return 0.25
 	def middle_q(self):
 		return 0.4
+	def top_x_fix(self):
+		return self.top_h * 0.0
 
 	# top_shift_h + top_r = top_h
 	# (top_shift_h + top_r) = 2 * top_r * top_ball_q
 	# top_h = 2 * top_r * top_ball_q
 	# top_r = top_h /( 2 * top_ball_q)
 	def top_cur_r(self, x):
-		dx = x - self.top_shift_h - self.middle_h - self.base_h
-		y_sq = self.top_r * self.top_r - dx * dx
+		d_fix = self.top_x_fix()
+		dx = x - self.top_shift_h - self.middle_h - self.base_h + d_fix
+		r_fix = self.top_r - d_fix
+		y_sq = r_fix * r_fix - dx * dx
 		#print("y_sq = " + str(y_sq) + " x = " + str(x))
 		if y_sq > 0.0:
 			return math.sqrt(y_sq)
@@ -428,6 +428,23 @@ class RoyalPiece(Piece3):
 		return 1.6
 	def crown_rq(self):
 		return 0.8
+	def get_edge_w(self, x):
+		save_x = x
+		x -= self.base_h + self.middle_h
+		if x < 0:
+			return edge_w
+		#print("funnel_h = " + str(self.funnel_h) + ", x = " + str(x))
+		cur_r = self.top_cur_r(save_x)
+		#print("funnel_h = " + str(self.funnel_h) + ", x = " + str(x) + " cur_r = " + str(cur_r))
+		if self.top_h - x < edge_w:
+			#print(" returning cur_r = " + str(cur_r))
+			return cur_r
+		res =  cur_r - self.crown_r * (self.top_h - x)/self.top_h
+		#print("returning " + str(res))
+		if res < edge_w:
+			return edge_w
+		return res
+
 	def top_cur_r(self, x):
 		x -= self.base_h + self.middle_h
 		if x < self.funnel_h:
@@ -440,7 +457,8 @@ class King(RoyalPiece):
 	def get_piece_name(self):
 		return "King"
 	def crown_cur_r(self, x):
-		return self.crown_r * (self.top_h - x)/(self.top_h - self.funnel_h)
+		r = self.crown_r * (self.top_h - x)/(self.top_h - self.funnel_h)
+		return r
 
 class Queen(RoyalPiece):
 	def __init__(self):
@@ -493,6 +511,30 @@ class Rook(Piece3):
 		if not all_in_one:
 			self.save_part("top")
 
+def bail(msg):
+	print("Error: " + msg)
+	sys.exit(1)
+
+def get_piece_obj(name):
+	name = name[0].upper() + name[1:].lower()
+	try:
+		obj = globals()[name]
+	except:
+		bail("Bad piece name " + name)
+	return obj()
+
+def make_all():
+	pawn = Pawn()
+	pawn.make()
+	bishop = Bishop()
+	bishop.make()
+	king = King()
+	king.make()
+	queen = Queen()
+	queen.make()
+	rook = Rook()
+	rook.make()
+
 args = get_args()
 
 origin = (0,0,0)
@@ -506,16 +548,8 @@ vn = int(args.num_vparts)
 edge_w = float(args.edge_w)
 piece = args.piece
 
-pawn = Pawn()
-pawn.make()
-if False:
-	pawn = Pawn()
-	pawn.make()
-	bishop = Bishop()
-	bishop.make()
-	king = King()
-	king.make()
-	queen = Queen()
-	queen.make()
-	rook = Rook()
-	rook.make()
+if piece:
+	piece_obj = get_piece_obj(piece)
+	piece_obj.make()
+else:
+	make_all()
