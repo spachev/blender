@@ -28,6 +28,8 @@ def get_args():
 	parser.add_argument('--num-parts', help="number of circle segements", required=True)
 	parser.add_argument('--num-vparts', help="number of vertical segements", required=True)
 	parser.add_argument('--piece', help='chess piece name', required=False)
+	parser.add_argument('--part', help='chess piece part', default="all", required=False)
+	parser.add_argument('--start-height', help='start height for partial print', default=0, required=False)
 	parsed_script_args, _ = parser.parse_known_args(script_args)
 	return parsed_script_args
 
@@ -40,7 +42,7 @@ def mk_file_path(orig_fname, suffix):
 
 class Piece:
 	def __init__(self):
-		pass
+		self.start_height = float(args.start_height)
 
 	def get_fname(self):
 		return self.get_piece_name().lower() + ".stl"
@@ -134,6 +136,10 @@ class Piece:
 		if not all_in_one:
 			self.save_part(part_name)
 
+	def out_of_bounds(self, x):
+		# print("x="+str(x)+", start_height=" + str(self.start_height))
+		return x < self.start_height
+
 	def make_conic_part_low(self, start_x, part_h, vn_arg, cur_r_f, part_name):
 		x = start_x
 		dx = part_h / float(vn_arg)
@@ -147,13 +153,28 @@ class Piece:
 		top_outer_face = None
 		bottom_inner_face = None
 		bottom_outer_face = None
+		cur_r = None
+		first_r = False
+		skipped_rings = 0
 		print("part_name = " + part_name + " start_x="+str(x) + " dx=" + str(dx))
 
 		for v_ind in range(0, vn_arg + 1):
-			cur_r = cur_r_f(x)
+			# out_of_bounds normally should always return false,
+			# but we might have a case when the print completed partially
+			# and we want to print the remaining part
+			if self.out_of_bounds(x):
+				x += dx
+				skipped_rings += 1
+				continue
+			if cur_r == None:
+				first_r = True
+			cur_r = cur_r_f(x - start_x)
+			if first_r:
+				print("start_r = " + str(cur_r))
+				first_r = False
 			if cur_r <= 0:
 				break
-			#print("x=" + str(x) + ", cur_r = " + str(cur_r))
+			# print("x=" + str(x) + ", cur_r = " + str(cur_r))
 			cur_verts = mu.get_circle_verts((0,0,x), cur_r, n)
 			cur_n_verts = len(verts)
 			verts += cur_verts
@@ -163,9 +184,10 @@ class Piece:
 			cur_inner_verts = mu.get_circle_verts((0,0,x), inner_r, n)
 			inner_verts += cur_inner_verts
 			x += dx
+			real_v_ind = v_ind - skipped_rings
 
-			if v_ind > 0:
-				base_low = (v_ind - 1) * n
+			if real_v_ind > 0:
+				base_low = (real_v_ind - 1) * n
 				for i in range(0, n):
 					next_i = base_low + (i + 1) % n
 					#print(base_low)
@@ -205,6 +227,7 @@ class Piece3(Piece):
 	def __init__(self):
 		super().__init__()
 		self.base_h = h * self.base_q()
+		self.part = args.part
 		self.middle_h = h * self.middle_q()
 		self.top_h = h * self.total_q() - self.base_h - self.middle_h
 		self.base_top_r = r * self.top_base_rq()
@@ -252,9 +275,10 @@ class Piece3(Piece):
 	def make(self):
 		for all_in_one in [False, True]:
 			mu.reset_scene()
-			self.make_base(all_in_one)
-			self.make_middle(all_in_one)
-			self.make_top(all_in_one)
+			for p in ["base", "middle", "top"]:
+				if self.part != "all" and self.part != p:
+					continue
+				getattr(self, "make_" + p)(all_in_one)
 		bpy.ops.export_mesh.stl(filepath=self.get_fname(), ascii=False)
 
 # real pawn: h = 30
@@ -311,7 +335,9 @@ class Knight(Piece3):
 		self.support_rq = 0.7
 		self.support_r = self.support_rq * self.base_top_r
 		self.top_dq = 0.6
+		self.head_q = 3.0
 		self.top_poly_d = self.base_poly_d * self.top_dq
+		self.head_d = self.top_poly_d * self.head_q
 		self.middle_bend_q = 0.3
 		self.middle_bend_h = self.middle_h * self.middle_bend_q
 		self.bend_dq = 1.3
@@ -348,8 +374,8 @@ class Knight(Piece3):
 		ky = (self.base_poly_d - self.top_poly_d)
 		dy = math.sqrt(dz/self.middle_h)  * ky
 		#dy = 20.0
-		print("z=" + str(z) + " dy=" + str(dy) + " dx=" + str(dx) +
-			" middle_bend_h=" + str(self.middle_bend_h))
+		#print("z=" + str(z) + " dy=" + str(dy) + " dx=" + str(dx) +
+		#	" middle_bend_h=" + str(self.middle_bend_h))
 		return mu.extend_poly([
 														[self.base_poly_d - dx_back, self.base_poly_d - dy, z],
 														[self.base_poly_d - dx_back, -self.base_poly_d + dy, z],
@@ -357,14 +383,19 @@ class Knight(Piece3):
 														[-self.base_poly_d + dx, self.base_poly_d - dy, z]
 													], self.poly_n)
 
+	def top_shift_q(self):
+		return 1.0
+
 	def top_cur_poly(self, z):
-		#dx = -self.base_top_r / 2.0 + self.base_poly_d * (z - self.base_h - self.middle_h)/self.top_h
-		dx = self.top_poly_d
+		dx = (-self.base_top_r / 2.0 + self.base_poly_d * (z - self.base_h - self.middle_h)/self.top_h)
+		#dx = self.top_poly_d
+		print("z=" + str(z) + ", dx = " + str(dx))
+		shift_x = -self.top_poly_d * self.top_shift_q()
 		return mu.extend_poly(
 			[
-				[self.top_poly_d, self.top_poly_d, z], [self.top_poly_d, -self.top_poly_d, z],
-				[-self.top_poly_d - dx, -self.top_poly_d, z] ,
-				[-self.top_poly_d - dx, self.top_poly_d, z]
+				[self.head_d + shift_x, self.head_d, z], [self.head_d + shift_x, -self.head_d, z],
+				[-self.top_poly_d + dx + shift_x, -self.top_poly_d , z] ,
+				[-self.top_poly_d + dx + shift_x, self.top_poly_d , z]
 		], self.poly_n)
 
 	def make_top(self, all_in_one):
