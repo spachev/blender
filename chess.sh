@@ -12,7 +12,7 @@ PAWN_PARTS=3
 # real pawn from chess set: radius = 8
 # height = 30, top_r = 5
 # base_h = 8
-#blender -b -P chess.py -- --save $OUT_FILE --height 300 --thickness 3 --num-parts 70 \
-#	--num-vparts 200 --radius 90 --edge-w 15 --piece knight
 blender -b -P chess.py -- --save $OUT_FILE --height 300 --thickness 3 --num-parts 70 \
-	--num-vparts 200 --radius 90 --edge-w 15 --piece pawn --part base --start-height 52.35
+	--num-vparts 200 --radius 90 --edge-w 15 --piece rook
+#blender -b -P chess.py -- --save $OUT_FILE --height 300 --thickness 3 --num-parts 70 \
+#	--num-vparts 200 --radius 90 --edge-w 15 --piece pawn

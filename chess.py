@@ -168,7 +168,7 @@ class Piece:
 				continue
 			if cur_r == None:
 				first_r = True
-			cur_r = cur_r_f(x - start_x)
+			cur_r = cur_r_f(x)
 			if first_r:
 				print("start_r = " + str(cur_r))
 				first_r = False
@@ -215,7 +215,7 @@ class Piece:
 			faces += mu.connect_circles(top_outer_face, top_inner_face, 0)
 
 		print("final x="+str(x) + " final r = " + str(cur_r))
-		print("n_verts="+str(len(verts)))
+		print("n_verts="+str(len(verts)) + " skipped_rings = " + str(skipped_rings))
 		#print("faces=" + str(faces))
 		#print("inner_faces=" + str(inner_faces))
 
@@ -510,6 +510,7 @@ class Rook(Piece3):
 		self.top_r = self.bend_r * self.top_rq()
 		self.pit_r = self.bend_r * (self.top_rq() - self.top_wall_rq())
 		self.pit_h = self.top_h * self.top_pit_q()
+		print("Rook: pit_h = " + str(self.pit_h))
 		self.top_d_pit = self.top_h - self.pit_h
 	def get_piece_name(self):
 		return "Rook"
@@ -529,18 +530,12 @@ class Rook(Piece3):
 		return 0.8
 	def top_cur_r(self, x):
 		return self.top_r
-	def pit_cur_r(self, x):
-		return self.pit_r
-	def make_top(self, all_in_one):
-		if not all_in_one:
-			mu.reset_scene()
-		self.make_conic_part(self.base_h + self.middle_h, self.top_d_pit, self.vn_top,
-			self.top_cur_r, "pitbottom", True)
-		self.make_ring_part(self.base_h + self.middle_h + self.top_d_pit, self.pit_h,
-			self.vn_top,
-			self.top_cur_r, self.pit_cur_r, "pit", True)
-		if not all_in_one:
-			self.save_part("top")
+	def get_edge_w(self, x):
+		x_rel_top = x - self.middle_h - self.base_h
+		# we are below the top part
+		if x_rel_top < 0 or x_rel_top > self.pit_h:
+			return edge_w
+		return self.top_cur_r(x)
 
 def bail(msg):
 	print("Error: " + msg)
