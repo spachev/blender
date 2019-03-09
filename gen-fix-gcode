@@ -1,0 +1,58 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+sub bail
+{
+	my $msg = shift;
+	die "Error: $msg\n";
+}
+
+my $z = $ARGV[0];
+
+bail("Missing z argument") unless $z;
+
+my $header = "";
+my $payload = "";
+
+while (my $line = <STDIN>)
+{
+	next if ($line =~ /Move the platform|^G28/);
+	$header .= $line;
+	last if ($line =~ /LAYER_COUNT/);
+}
+
+my ($x, $y);
+
+while (my $line = <STDIN>)
+{
+	next unless ($line =~ /G.*X.*Y.*Z([\d\.]+)/);
+	my $cur_z = $1;
+	if ($cur_z == $z)
+	{
+		$payload = $line;
+		last;
+	}
+}
+
+while (my $line = <STDIN>)
+{
+	$payload .= $line;
+	next unless ($line =~ /^G0\s+X([\d\.]+)\s+Y([\d\.]+)\s*$/);
+	$x = $1;
+	$y = $2;
+	last;
+}
+
+print <<eot;
+G28
+G0 X0 Y0 Z$z
+G0 X$x Y$y
+M0 Press to continue
+G0 X0 Y0
+eot
+
+print $header;
+print $payload;
+print join('', <STDIN>);
