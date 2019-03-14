@@ -460,6 +460,22 @@ class Knight(Piece3):
 		]
 		return mu.extend_poly(poly, self.poly_n)
 
+	def add_eyes_to_poly_low(self, poly, z, shift_x, cur_eye_w, cur_eye_l, cur_eye_dl):
+		eye_1_poly = [
+			[self.top_poly_l + shift_x - self.eye_l_pos, -self.top_poly_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl, -self.top_poly_w + cur_eye_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl, -self.top_poly_w + cur_eye_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l, -self.top_poly_w, z]
+		]
+		eye_2_poly = [
+			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l, self.top_poly_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl,
+					self.top_poly_w - cur_eye_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl , self.top_poly_w - cur_eye_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos , self.top_poly_w, z]
+		]
+		return poly[0:2] + eye_1_poly + poly[2:] + eye_2_poly + poly[0:1]
+
 	def add_eyes_to_poly(self, poly, z, shift_x):
 		eye_r = self.eye_h/2
 		rel_z = z - self.middle_h - self.base_h - self.eye_h_pos
@@ -467,18 +483,7 @@ class Knight(Piece3):
 		cur_eye_w = self.eye_w * q
 		cur_eye_l = self.eye_l * (1 - q)
 		cur_eye_dl = (self.eye_l - cur_eye_l)/2
-		return poly[0:2] + [
-			[self.top_poly_l + shift_x - self.eye_l_pos, -self.top_poly_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl, -self.top_poly_w + cur_eye_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl, -self.top_poly_w + cur_eye_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l, -self.top_poly_w, z]
-		] + poly[2:] + [
-			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l, self.top_poly_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl,
-					self.top_poly_w - cur_eye_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl , self.top_poly_w - cur_eye_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos , self.top_poly_w, z]
-		]
+		return self.add_eyes_to_poly_low(poly, z, shift_x, cur_eye_w, cur_eye_l, cur_eye_dl)
 
 	def top_cur_poly(self, z):
 		dx = 0
@@ -494,8 +499,12 @@ class Knight(Piece3):
 		if dz > self.eye_h_pos and dz < self.eye_h_pos + self.eye_h:
 			poly = self.add_eyes_to_poly(poly, z, shift_x)
 			print("eye_poly: " + str(poly))
+		else:
+			# a hack to align the polygons at the joint with eyes
+			poly = self.add_eyes_to_poly_low(poly, z, shift_x, 0, self.eye_l, self.eye_l)
 		poly = mu.extend_poly(poly, self.poly_n)
 		#print("poly has length " + str(len(poly)))
+		#print("poly = " + str(poly))
 		return poly
 
 	def make_top(self, all_in_one):
