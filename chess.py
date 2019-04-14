@@ -121,13 +121,16 @@ class Piece:
 			x += dx
 			if n_poly == None:
 				n_poly = len(cur_poly)
+			assert(n_poly == len(cur_poly))
 			if v_ind > 0:
 				base_low = (v_ind - 1) * n_poly
 				for i in range(0, n_poly):
 					next_i = base_low + (i + 1) % n_poly
 					faces.append([ base_low + i, next_i, next_i + n_poly,
 								base_low + i + n_poly ])
-		faces.append(range(0, n_poly))
+		#print("bottom_face:" + str(verts[0:n_poly]))
+		bottom_face = range(0, n_poly)
+		faces.append(bottom_face)
 		faces.append(range((vn_arg) * n_poly, (vn_arg + 1) * n_poly))
 		mu.create_mesh_from_data(self.get_piece_name() + ' ' + part_name, o_v, verts, faces, True)
 		if not all_in_one:
@@ -344,17 +347,20 @@ class Pawn(Piece3):
 class Knight(Piece3):
 	def __init__(self):
 		super().__init__()
+		self.real_base_h = self.base_h
+		self.support_h = self.middle_h * self.support_q()
+		self.base_h += self.support_h
 		self.base_poly_d = self.base_top_r / math.sqrt(2)
 		self.poly_n = n
-		self.support_h = self.middle_h * self.support_q()
-		self.support_rq = 0.7
+		self.support_rq = 1.05
 		self.support_r = self.support_rq * self.base_top_r
+		self.support_top_h = self.support_h * self.support_top_hq()
 		self.head_q = 1.0
 		self.bend_neck_w = self.support_r * self.base_support_q() * (1 -
 				self.middle_low_yq())
 		self.top_neck_w = self.bend_neck_w * self.top_neck_q()
 		self.top_poly_l = self.base_poly_d * self.top_dq()
-		self.top_poly_w = self.top_neck_w
+		self.top_poly_w = self.top_neck_w * (1 + self.extra_head_wq())
 		self.middle_bend_q = 0.18
 		self.middle_bend_h = self.middle_h * self.middle_bend_q
 		self.bend_h2 = self.middle_h - self.middle_bend_h
@@ -364,14 +370,27 @@ class Knight(Piece3):
 		self.ear_h = self.top_h * self.ear_q()
 		self.ear_l = self.top_poly_l * self.ear_ql()
 		self.ear_w = self.top_poly_w * self.ear_qw()
+		self.ear_w_pos = self.top_poly_w * self.ear_w_pos_q()
+		self.ear_l_pos = self.ear_l * self.ear_pos_q()
 		self.eye_h = self.top_h * self.eye_q()
 		self.eye_h_pos = self.top_h - 2 * self.eye_h - self.ear_h
-		self.eye_l_pos = 2 * self.top_poly_l - self.ear_l * 4
 		self.eye_w = self.eye_h
 		self.eye_l = self.eye_h * 2
+		self.eye_l_pos = 2 * self.top_poly_l - self.eye_l * self.eye_pos_q()
+		self.mouth_h_pos = (self.top_h - self.ear_h)/2
+		self.mouth_h = self.top_h * self.mouth_q()
+		self.mouth_l = self.top_poly_l * self.mouth_ql()
 
 	def get_piece_name(self):
 		return "Knight"
+	def eye_pos_q(self):
+		return 3.0
+	def ear_w_pos_q(self):
+		return 0.3
+	def ear_pos_q(self):
+		return 1.5
+	def extra_head_wq(self):
+		return 0.2
 	def eye_q(self):
 		return 0.1
 	def eye_ql(self):
@@ -379,11 +398,13 @@ class Knight(Piece3):
 	def eye_qw(self):
 		return 0.1
 	def top_neck_q(self):
-		return 0.6
+		return 0.4
 	def top_dwq(self):
 		return 0.5
 	def top_dq(self):
-		return 1.2
+		return 1.5
+	def support_top_hq(self):
+		return 0.1
 	def support_q(self):
 		return 0.1
 	def top_base_rq(self):
@@ -401,16 +422,27 @@ class Knight(Piece3):
 	def middle_low_yq(self):
 		return 0.5
 	def base_support_q(self):
-		return 1.1
+		return 1.0
 	def middle_upper_q(self):
 		return 1.1
 	def bend_neck_q(self):
 		return 2.0
 
+	def get_edge_w(self, z):
+		edge_w = super().get_edge_w(z)
+		if self.base_h - self.support_top_h > z > self.real_base_h:
+			edge_w -= (self.base_cur_r(self.real_base_h) - self.support_r)
+		elif z > self.base_h - self.support_top_h:
+			edge_w = self.base_cur_r(self.real_base_h)
+		return edge_w
+
+	def base_cur_r(self, z):
+		if z > self.real_base_h:
+			return self.support_r
+		return super().base_cur_r(z)
+
 	def middle_cur_poly(self, z):
-		if z < self.base_h + self.support_h:
-			return mu.get_circle_verts((0, 0, z), self.support_r, self.poly_n)
-		dz = z - self.base_h - self.support_h
+		dz = z - self.base_h
 		#dx = self.base_poly_d * dz/self.middle_h
 		if dz < self.middle_bend_h:
 			dx = self.bend_neck_l * math.sqrt(1 -
@@ -433,75 +465,92 @@ class Knight(Piece3):
 													], self.poly_n)
 
 	def top_shift_q(self):
-		return 0.2
+		return -0.3
 	def ear_q(self):
-		return 0.4
+		return 0.3
 	def ear_qw(self):
-		return 0.2
+		return 0.4
 	def ear_ql(self):
 		return 0.2
+	def mouth_q(self):
+		return 0.1
+	def mouth_ql(self):
+		return 0.05
 
 	def ear_poly_left(self, z):
-		return self.ear_poly_low(z, -self.top_poly_l + 2 * self.ear_l,
-														 self.top_poly_w - 2 * self.ear_w)
+		return self.ear_poly_low(z, -self.top_poly_l +  self.ear_l_pos,
+														 self.top_poly_w - self.ear_w_pos)
 
 	def ear_poly_right(self, z):
-		return self.ear_poly_low(z, -self.top_poly_l + 2 * self.ear_l,
-														-self.top_poly_w + 2 * self.ear_w)
+		return self.ear_poly_low(z, -self.top_poly_l + self.ear_l_pos,
+														-self.top_poly_w + self.ear_w_pos)
 
-	def ear_poly_low(self, z, x, y):
+	def ear_poly_low(self, z, x, y, flip=False):
 		dz = self.top_h + self.base_h + self.middle_h - z
 		k = dz / self.ear_h
-		dx = self.ear_l * k
-		dy = self.ear_w * k
+		dx = self.ear_l * k/2
+		dy = self.ear_w * k/2
 		poly = [
 			[x + dx, y + dy, z], [x - dx, y + dy, z],
-			[x - dx, y - dy, z], [x + dy, y - dy, z]
+			[x - dx, y - dy, z], [x + dx, y - dy, z]
 		]
 		return mu.extend_poly(poly, self.poly_n)
 
-	def add_eyes_to_poly_low(self, poly, z, shift_x, cur_eye_w, cur_eye_l, cur_eye_dl):
+	def add_eyes_to_poly_low(self, poly, z, shift_x, cur_eye_w, cur_eye_dl_outer, cur_eye_dl):
 		eye_1_poly = [
-			[self.top_poly_l + shift_x - self.eye_l_pos, -self.top_poly_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl_outer, -self.top_poly_w, z],
 			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl, -self.top_poly_w + cur_eye_w, z],
 			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl, -self.top_poly_w + cur_eye_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l, -self.top_poly_w, z]
+			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl_outer,
+				-self.top_poly_w, z]
 		]
 		eye_2_poly = [
-			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l, self.top_poly_w, z],
+			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl_outer,
+				self.top_poly_w, z],
 			[self.top_poly_l + shift_x - self.eye_l_pos - self.eye_l + cur_eye_dl,
 					self.top_poly_w - cur_eye_w, z],
 			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl , self.top_poly_w - cur_eye_w, z],
-			[self.top_poly_l + shift_x - self.eye_l_pos , self.top_poly_w, z]
+			[self.top_poly_l + shift_x - self.eye_l_pos - cur_eye_dl_outer , self.top_poly_w, z]
 		]
-		return poly[0:2] + eye_1_poly + poly[2:] + eye_2_poly + poly[0:1]
+		#eye_1_poly = []
+		#eye_2_poly = []
+		return poly[0:2] + eye_1_poly + poly[2:] + eye_2_poly
 
 	def add_eyes_to_poly(self, poly, z, shift_x):
 		eye_r = self.eye_h/2
 		rel_z = z - self.middle_h - self.base_h - self.eye_h_pos
-		q = (1 - math.sqrt(1 - ((rel_z - eye_r)/eye_r)**2))
+		q = math.sqrt(1 - ((rel_z - eye_r)/eye_r)**2)
 		cur_eye_w = self.eye_w * q
-		cur_eye_l = self.eye_l * (1 - q)
+		cur_eye_l = self.eye_l * q
 		cur_eye_dl = (self.eye_l - cur_eye_l)/2
-		return self.add_eyes_to_poly_low(poly, z, shift_x, cur_eye_w, cur_eye_l, cur_eye_dl)
+		cur_eye_dl_outer =  cur_eye_dl/2
+		print("rel_z=" + str(rel_z) + " cur_eye_l = " + str(cur_eye_l) + " cur_eye_w = " +
+			str(cur_eye_w))
+		return self.add_eyes_to_poly_low(poly, z, shift_x, cur_eye_w, cur_eye_dl_outer, cur_eye_dl)
 
 	def top_cur_poly(self, z):
-		dx = 0
-		#shift_x = self.top_poly_l * self.top_shift_q()
-		shift_x = 0
+		dx_front = 0
+		dx_back = 0
+		shift_x = self.top_poly_l * self.top_shift_q()
+		#print("shift_x="+str(shift_x))
+		#shift_x = 0
 		dz = z - self.middle_h - self.base_h
-		poly = [[self.top_poly_l + shift_x, self.top_poly_w, z],
-					[self.top_poly_l + shift_x, -self.top_poly_w, z],
-					[-self.top_poly_l + dx + shift_x, -self.top_poly_w , z] ,
-					[-self.top_poly_l + dx + shift_x, self.top_poly_w , z]
+		if self.mouth_h_pos - self.mouth_h/2 < dz < self.mouth_h_pos + self.mouth_h/2:
+			dx_front = -self.mouth_l * (1 - abs(dz - self.mouth_h_pos)/(self.mouth_h/2))
+		poly = [[self.top_poly_l + shift_x + dx_front, self.top_poly_w, z],
+					[self.top_poly_l + shift_x + dx_front, -self.top_poly_w, z],
+					[-self.top_poly_l + dx_back + shift_x, -self.top_poly_w , z] ,
+					[-self.top_poly_l + dx_back + shift_x, self.top_poly_w , z]
 				]
-		print("dz=" + str(dz) + "eye_h_pos=" + str(self.eye_h_pos) + " top_h")
+		#print("dz=" + str(dz) + "eye_h_pos=" + str(self.eye_h_pos) + " top_h")
 		if dz > self.eye_h_pos and dz < self.eye_h_pos + self.eye_h:
 			poly = self.add_eyes_to_poly(poly, z, shift_x)
-			print("eye_poly: " + str(poly))
+			#print("eye_poly: " + str(poly))
 		else:
 			# a hack to align the polygons at the joint with eyes
-			poly = self.add_eyes_to_poly_low(poly, z, shift_x, 0, self.eye_l, self.eye_l)
+			cur_eye_dl = self.eye_l/2
+			cur_eye_dl_outer =  cur_eye_dl/2
+			poly = self.add_eyes_to_poly_low(poly, z, shift_x, 0.0001, cur_eye_dl, cur_eye_dl_outer)
 		poly = mu.extend_poly(poly, self.poly_n)
 		#print("poly has length " + str(len(poly)))
 		#print("poly = " + str(poly))

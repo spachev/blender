@@ -80,14 +80,18 @@ def extend_poly(poly, target_n):
 	n_poly = len(poly)
 	if n_poly > target_n:
 		raise Exception("Polygon has too many verts")
-	verts_per_side = target_n // n_poly
-	if target_n % n_poly:
-		verts_per_side += 1
+	verts_per_side_base = target_n // n_poly
+	verts_per_side_mod = target_n % n_poly
+	verts_per_side_accum = verts_per_side_mod
 	new_poly = []
 	for i in range(0, n_poly):
 		v1 = poly[i]
 		v2 = poly[(i + 1) % n_poly]
 		dv = [0, 0, 0]
+		verts_per_side = verts_per_side_base
+		if verts_per_side_accum >= n_poly:
+			verts_per_side_accum -= n_poly
+			verts_per_side += 1
 		for j in range(0,3):
 			dv[j] = (v2[j] - v1[j]) / verts_per_side
 		for k in range(0, verts_per_side):
@@ -97,7 +101,9 @@ def extend_poly(poly, target_n):
 			new_poly.append(v)
 			if len(new_poly) == target_n:
 				return new_poly
-	raise Exception("Bug: should never get here: len(new_poly) = " + str(len(new_poly)))
+		verts_per_side_accum += verts_per_side_mod
+	raise Exception("Bug: should never get here: len(new_poly) = " + str(len(new_poly))
+		+ str(new_poly))
 
 
 def reset_scene():
@@ -257,4 +263,14 @@ def add_text(txt, origin, r, n, font_size):
 	#fo.matrix_world = mat_rot_x * mat_rot_y
 	scene.update()
 	#print(len(scene.objects))
+
+if __name__ == "__main__":
+	poly = [[0,0,0], [10,0,0], [10,10,0], [0,10,0], [0,7,0], [3,7,0], [3,4,0],[0,4,0]]
+	eps = 0.0000001
+	for n in range(11,24):
+		print("n=" + str(n))
+		e_poly = extend_poly(poly, n)
+		print(str(e_poly))
+		assert(abs(e_poly[-1][0]) <= eps)
+	print(poly)
 
